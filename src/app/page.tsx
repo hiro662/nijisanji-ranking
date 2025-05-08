@@ -10,6 +10,19 @@ import { parseDuration } from '@/lib/utils'; // Import parseDuration from utils
 import { EnrichedVideoDetails } from '@/lib/youtube'; // Import EnrichedVideoDetails
 
 // Removed local Video interface definition
+// Import Video interface from API route (or a shared types file if created)
+interface Video { // This should ideally be imported if defined in a shared location
+  title: string;
+  video_id: string;
+  view_count: number;
+  published_at: string;
+  thumbnail: string;
+  duration: string;
+  channelTitle: string;
+  channelIcon?: string | null;
+  channelId?: string; // Added based on usage below
+}
+
 
 export default function Home() {
   const [videos, setVideos] = useState<EnrichedVideoDetails[]>([]); // Use EnrichedVideoDetails
@@ -67,7 +80,7 @@ export default function Home() {
       // For now, assume it's compatible or already mapped in the API route.
       // const typedRelevantVideos: EnrichedVideoDetails[] = relevantVideos || [];
       // APIレスポンスの型 (view_countなどスネークケース) から EnrichedVideoDetails (キャメルケース) へマッピング
-      const typedRelevantVideos: EnrichedVideoDetails[] = (relevantVideos || []).map((apiVideo: any) => ({
+      const typedRelevantVideos: EnrichedVideoDetails[] = (relevantVideos || []).map((apiVideo: Video) => ({
         videoId: apiVideo.video_id,
         title: apiVideo.title,
         viewCount: apiVideo.view_count, // スネークケースからキャメルケースへ

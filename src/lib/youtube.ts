@@ -107,7 +107,8 @@ export async function fetchPlaylistVideos(
         try {
           const errorData = await response.json();
           console.error('APIエラー詳細:', errorData);
-        } catch (parseError) {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_parseError) { // _parseError として未使用であることを示す
           // Ignore if response body is not JSON or empty
         }
         break; // Stop fetching for this playlist on HTTP error
@@ -131,8 +132,12 @@ export async function fetchPlaylistVideos(
 
       nextPageToken = data.nextPageToken;
 
-    } catch (error: any) {
-      console.error(`プレイリスト ${playlistId} の取得中にネットワークエラーまたはJSON解析エラー:`, error.message);
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error instanceof Error) {
+        message = error.message;
+      }
+      console.error(`プレイリスト ${playlistId} の取得中にネットワークエラーまたはJSON解析エラー:`, message);
       break; // Stop fetching for this playlist on network/parse error
     }
   } while (nextPageToken && playlistVideos.length < MAX_TOTAL_VIDEOS_PER_PLAYLIST); // Use constant
@@ -212,6 +217,16 @@ export async function fetchVideoDetails(videoIds: string[]): Promise<EnrichedVid
 
 // チャンネルIDのリストからチャンネルアイコンを取得するヘルパー関数（キャッシュ対応）
 // Return type updated to allow null
+
+interface ChannelItem {
+  id: string;
+  snippet?: {
+    thumbnails?: {
+      default?: { url: string };
+    };
+  };
+}
+
 async function fetchChannelIcons(channelIds: string[]): Promise<{ [key: string]: string | null }> {
   const apiKey = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY!;
   const currentTime = Date.now();
@@ -259,12 +274,16 @@ async function fetchChannelIcons(channelIds: string[]): Promise<{ [key: string]:
       }
 
       if (data.items && Array.isArray(data.items)) {
-        data.items.forEach((item: any) => {
+        data.items.forEach((item: ChannelItem) => {
           newChannelIconMap[item.id] = item.snippet?.thumbnails?.default?.url || null;
         });
       }
-    } catch (error: any) {
-      console.error('チャンネル情報取得中にネットワークエラー:', error.message);
+    } catch (error: unknown) {
+      let message = 'Unknown error';
+      if (error instanceof Error) {
+        message = error.message;
+      }
+      console.error('チャンネル情報取得中にネットワークエラー:', message);
       // エラーが発生しても処理を続ける場合がある
     }
   }

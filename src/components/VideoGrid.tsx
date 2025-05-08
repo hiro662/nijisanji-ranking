@@ -8,6 +8,7 @@ import { formatDuration as formatDurationUtil } from '@/lib/utils'; // parseDura
 import { EnrichedVideoDetails } from '@/lib/youtube'; // Import EnrichedVideoDetails
 import { formatDistanceToNowStrict } from 'date-fns';
 import { ja } from 'date-fns/locale';
+import Image from 'next/image';
 
 // Removed local Video interface definition
 
@@ -87,19 +88,20 @@ export default function VideoGrid({ videos, loading }: VideoGridProps) {
                 <CardContent className="p-0">
                   {/* Thumbnail and Duration */}
                   <div className="relative">
-                    <img
-                      // Use placeholder if thumbnail is empty or null/undefined
+                    <Image
                       src={video.thumbnail || PLACEHOLDER_THUMBNAIL}
                       alt={video.title}
-                      // Add error handling for image loading
+                      width={320} // Example width, adjust as needed
+                      height={180} // Example height (16:9), adjust as needed
+                      className="w-full h-auto aspect-video object-cover bg-gray-200"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
                         if (target.src !== PLACEHOLDER_THUMBNAIL) {
-                           target.src = PLACEHOLDER_THUMBNAIL; // Fallback to placeholder on error
+                           target.src = PLACEHOLDER_THUMBNAIL;
                            target.alt = 'サムネイル読み込みエラー';
                         }
                       }}
-                      className="w-full h-auto aspect-video object-cover bg-gray-200" // Add background color for loading/error state
+                      unoptimized={video.thumbnail?.startsWith('http://') || video.thumbnail?.startsWith('https://') ? undefined : true} // For external images, optimization might be enabled by default. For local placeholders, it might not be needed or configured.
                     />
                     <span className="absolute bottom-1 right-1 bg-black bg-opacity-75 text-white text-xs px-1.5 py-0.5 rounded">
                       {formatDurationUtil(video.duration)}
@@ -120,10 +122,19 @@ export default function VideoGrid({ videos, loading }: VideoGridProps) {
                     {/* Channel Info */}
                     <div className="flex items-center gap-2 mb-1.5">
                       {video.channelIcon ? (
-                        <img
+                        <Image
                           src={video.channelIcon}
                           alt={`${video.channelTitle} icon`}
+                          width={24}
+                          height={24}
                           className="w-6 h-6 rounded-full object-cover border"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            // Simple fallback: hide the image or show a placeholder div
+                            target.style.display = 'none';
+                            // Optionally, replace with a placeholder div if you have one styled
+                          }}
+                          unoptimized={video.channelIcon?.startsWith('http://') || video.channelIcon?.startsWith('https://') ? undefined : true}
                         />
                       ) : (
                         <div className="w-6 h-6 rounded-full bg-gray-200 border flex items-center justify-center">

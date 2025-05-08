@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
-import { fetchPlaylistVideos, fetchVideoDetails } from '../../../lib/youtube';
+import { fetchPlaylistVideos, fetchVideoDetails, PlaylistItem, EnrichedVideoDetails } from '../../../lib/youtube';
 import { VIDEO_PLAYLIST_IDS } from '../../../config/constants';
 
 // 型定義（page.tsx から再利用）
@@ -12,10 +12,10 @@ interface Video {
   thumbnail: string;
   duration: string;
   channelTitle: string;
-  channelIcon?: string;
+  channelIcon?: string | null;
 }
 
-const ONE_HOUR_MS = 60 * 60 * 1000; // 1時間
+const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000; // 12時間
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       cachedVideos &&
       cachedRecommendedVideos &&
       cachedLastFetchTime &&
-      currentTime - cachedLastFetchTime < ONE_HOUR_MS
+      currentTime - cachedLastFetchTime < TWELVE_HOURS_MS
     ) {
       console.log('キャッシュからデータを返します');
       return NextResponse.json({
@@ -74,20 +74,20 @@ export async function GET(request: Request) {
     allVideoPlaylistVideos = allVideoPlaylistVideos.concat(exceptionPlaylistVideos);
 
     // 動画IDの重複を除去
-    const uniqueVideoMap = new Map<string, any>();
-    allVideoPlaylistVideos.forEach((video: any) =>
+    const uniqueVideoMap = new Map<string, PlaylistItem>();
+    allVideoPlaylistVideos.forEach((video: PlaylistItem) =>
       uniqueVideoMap.set(video.snippet.resourceId.videoId, video)
     );
     allVideoPlaylistVideos = Array.from(uniqueVideoMap.values());
     console.log(`重複除去後の動画数: ${allVideoPlaylistVideos.length}`);
 
     // 動画詳細を取得
-    const videoIds = allVideoPlaylistVideos.map((video: any) => video.snippet.resourceId.videoId);
+    const videoIds = allVideoPlaylistVideos.map((video: PlaylistItem) => video.snippet.resourceId.videoId);
     const videoDetails = videoIds.length ? await fetchVideoDetails(videoIds) : [];
 
     const youtubeVideoData: Video[] = allVideoPlaylistVideos
-      .map((playlistItem: any) => {
-        const details = videoDetails.find((d: any) => d.videoId === playlistItem.snippet.resourceId.videoId);
+      .map((playlistItem: PlaylistItem) => {
+        const details = videoDetails.find((d: EnrichedVideoDetails) => d.videoId === playlistItem.snippet.resourceId.videoId);
         if (!details || details.isShort) return null;
         return {
           title: playlistItem.snippet.title,
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
           channelIcon: details.channelIcon,
         };
       })
-      .filter((video: any): video is Video => video !== null) as Video[];
+      .filter((video: Video | null): video is Video => video !== null) as Video[];
 
     // おすすめプレイリスト
     const recommendedPlaylistId = 'PL_WIds0FOHm7W6WwVCtEHzcfylcm7-TmE';
@@ -109,21 +109,21 @@ export async function GET(request: Request) {
       '2000-01-01T00:00:00Z',
       publishedBefore
     );
-    const uniqueRecommendedMap = new Map<string, any>();
-    recommendedPlaylistVideos.forEach((video: any) =>
+    const uniqueRecommendedMap = new Map<string, PlaylistItem>();
+    recommendedPlaylistVideos.forEach((video: PlaylistItem) =>
       uniqueRecommendedMap.set(video.snippet.resourceId.videoId, video)
     );
     const uniqueRecommendedVideos = Array.from(uniqueRecommendedMap.values());
 
-    const recommendedVideoIds = uniqueRecommendedVideos.map((video: any) => video.snippet.resourceId.videoId);
+    const recommendedVideoIds = uniqueRecommendedVideos.map((video: PlaylistItem) => video.snippet.resourceId.videoId);
     const recommendedVideoDetails = recommendedVideoIds.length
       ? await fetchVideoDetails(recommendedVideoIds)
       : [];
 
     const recommendedVideoData: Video[] = uniqueRecommendedVideos
-      .map((playlistItem: any) => {
+      .map((playlistItem: PlaylistItem) => {
         const details = recommendedVideoDetails.find(
-          (d: any) => d.videoId === playlistItem.snippet.resourceId.videoId
+          (d: EnrichedVideoDetails) => d.videoId === playlistItem.snippet.resourceId.videoId
         );
         if (!details || details.isShort) return null;
         return {
@@ -137,7 +137,7 @@ export async function GET(request: Request) {
           channelIcon: details.channelIcon,
         };
       })
-      .filter((video: any): video is Video => video !== null) as Video[];
+      .filter((video: Video | null): video is Video => video !== null) as Video[];
 
     // 動画が取得できなかった場合
     if (!youtubeVideoData.length && !recommendedVideoData.length) {
@@ -148,18 +148,24 @@ export async function GET(request: Request) {
     console.log('取得した動画データ:', youtubeVideoData.length);
     console.log('取得したおすすめ動画データ:', recommendedVideoData.length);
 
-    // キャッシュを更新（1時間有効）
-    await kv.set('videos', youtubeVideoData, { ex: ONE_HOUR_MS / 1000 });
-    await kv.set('recommendedVideos', recommendedVideoData, { ex: ONE_HOUR_MS / 1000 });
-    await kv.set('lastFetchTime', currentTime, { ex: ONE_HOUR_MS / 1000 });
+    // キャッシュを更新（12時間有効）
+    await kv.set('videos', youtubeVideoData, { ex: TWELVE_HOURS_MS / 1000 });
+    await kv.set('recommendedVideos', recommendedVideoData, { ex: TWELVE_HOURS_MS / 1000 });
+    await kv.set('lastFetchTime', currentTime, { ex: TWELVE_HOURS_MS / 1000 });
 
     return NextResponse.json({
       videos: youtubeVideoData,
       recommendedVideos: recommendedVideoData,
       lastFetchTime: currentTime,
     });
-  } catch (error: any) {
-    console.error('動画取得エラー:', { message: error.message, stack: error.stack });
-    return NextResponse.json({ error: `Failed to fetch videos: ${error.message}` }, { status: 500 });
+  } catch (error: unknown) {
+    let errorMessage = 'An unknown error occurred';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      console.error('動画取得エラー:', { message: error.message, stack: error.stack });
+    } else {
+      console.error('動画取得エラー (unknown type):', error);
+    }
+    return NextResponse.json({ error: `Failed to fetch videos: ${errorMessage}` }, { status: 500 });
   }
 }
