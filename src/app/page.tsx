@@ -79,9 +79,10 @@ export default function Home() {
         isShort: parseDuration(apiVideo.duration) <= 60,
         channelId: apiVideo.channelId || '', // APIレスポンスにchannelIdがない場合があるためフォールバック
       }));
+      console.log(`APIレスポンスをマッピング後の動画 (${typedRelevantVideos.length}件):`, typedRelevantVideos.map(v => ({title: v.title, channel: v.channelTitle, views: v.viewCount, published: v.publishedAt })));
 
 
-      const filteredAndSortedVideos = typedRelevantVideos
+      const videosAfterDateAndDurationFilter = typedRelevantVideos
         .filter((video: EnrichedVideoDetails) => { // Use EnrichedVideoDetails
           // Apply date filtering only if not 'recommended'
           if (filter !== 'recommended') {
@@ -96,9 +97,13 @@ export default function Home() {
            // const durationInSeconds = parseDuration(video.duration);
            // return durationInSeconds >= 60;
           return !video.isShort; // おすすめ動画は短編を除外 (isShortを使用)
-        })
+        });
+      console.log(`期間・時間フィルター (${filter}) 後の動画 (${videosAfterDateAndDurationFilter.length}件, ソート・スライス前):`, videosAfterDateAndDurationFilter.map(v => ({title: v.title, channel: v.channelTitle, views: v.viewCount, published: v.publishedAt })));
+
+      const filteredAndSortedVideos = videosAfterDateAndDurationFilter
         .sort((a: EnrichedVideoDetails, b: EnrichedVideoDetails) => b.viewCount - a.viewCount) // Use viewCount from EnrichedVideoDetails
         .slice(0, filter === 'day' ? 12 : 30); // Apply limit based on filter
+      console.log(`最終的な表示動画 (${filter}, ${filteredAndSortedVideos.length}件, ソート・スライス後):`, filteredAndSortedVideos.map(v => ({title: v.title, channel: v.channelTitle, views: v.viewCount, published: v.publishedAt })));
 
       setVideos(filteredAndSortedVideos);
 

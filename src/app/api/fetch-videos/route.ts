@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 import { fetchPlaylistVideos, fetchVideoDetails } from '../../../lib/youtube';
+import { VIDEO_PLAYLIST_IDS } from '../../../config/constants';
 
 // 型定義（page.tsx から再利用）
 interface Video {
@@ -50,13 +51,14 @@ export async function GET(request: Request) {
     const oneMonthAgo = new Date(now.setMonth(now.getMonth() - 1)).toISOString();
     const publishedBefore = new Date().toISOString();
 
-    const videoPlaylistIds = [
-      'UUeuNlK0yX-6_4930q0JUGNw',
-      // 他のプレイリストID（省略）
-    ];
+    // config/constants.ts からインポートした VIDEO_PLAYLIST_IDS を使用
+    // const videoPlaylistIds = [
+    //   'UUeuNlK0yX-6_4930q0JUGNw',
+    //   // 他のプレイリストID（省略）
+    // ];
 
     // 並列処理でプレイリスト動画を取得
-    const playlistPromises = videoPlaylistIds.map(id =>
+    const playlistPromises = VIDEO_PLAYLIST_IDS.map(id =>
       fetchPlaylistVideos(id, oneMonthAgo, publishedBefore)
     );
     const playlistResults = await Promise.all(playlistPromises);
