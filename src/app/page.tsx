@@ -65,7 +65,21 @@ export default function Home() {
       // Assuming relevantVideos from API matches or can be mapped to EnrichedVideoDetails
       // If the API returns a different structure, mapping might be needed here.
       // For now, assume it's compatible or already mapped in the API route.
-      const typedRelevantVideos: EnrichedVideoDetails[] = relevantVideos || [];
+      // const typedRelevantVideos: EnrichedVideoDetails[] = relevantVideos || [];
+      // APIレスポンスの型 (view_countなどスネークケース) から EnrichedVideoDetails (キャメルケース) へマッピング
+      const typedRelevantVideos: EnrichedVideoDetails[] = (relevantVideos || []).map((apiVideo: any) => ({
+        videoId: apiVideo.video_id,
+        title: apiVideo.title,
+        viewCount: apiVideo.view_count, // スネークケースからキャメルケースへ
+        publishedAt: apiVideo.published_at,
+        thumbnail: apiVideo.thumbnail,
+        duration: apiVideo.duration,
+        channelTitle: apiVideo.channelTitle,
+        channelIcon: apiVideo.channelIcon || null,
+        isShort: parseDuration(apiVideo.duration) <= 60,
+        channelId: apiVideo.channelId || '', // APIレスポンスにchannelIdがない場合があるためフォールバック
+      }));
+
 
       const filteredAndSortedVideos = typedRelevantVideos
         .filter((video: EnrichedVideoDetails) => { // Use EnrichedVideoDetails
@@ -74,13 +88,14 @@ export default function Home() {
             const publishedDate = new Date(video.publishedAt); // Correct property name
             const startDate = new Date(publishedAfter);
             // Duration check (>= 60 seconds) - Moved parseDuration definition earlier
+            // isShort プロパティで判定するように変更も可能だが、既存ロジックを維持
             const durationInSeconds = parseDuration(video.duration);
             return (filter === 'all' || publishedDate >= startDate) && durationInSeconds >= 60;
           }
           // For 'recommended', duration check might still be relevant if API doesn't pre-filter shorts
-           const durationInSeconds = parseDuration(video.duration);
-           return durationInSeconds >= 60;
-          // return true; // Keep all recommended videos if API guarantees they are not shorts
+           // const durationInSeconds = parseDuration(video.duration);
+           // return durationInSeconds >= 60;
+          return !video.isShort; // おすすめ動画は短編を除外 (isShortを使用)
         })
         .sort((a: EnrichedVideoDetails, b: EnrichedVideoDetails) => b.viewCount - a.viewCount) // Use viewCount from EnrichedVideoDetails
         .slice(0, filter === 'day' ? 12 : 30); // Apply limit based on filter
