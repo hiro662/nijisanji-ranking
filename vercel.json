@@ -1,8 +1,13 @@
 {
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "devCommand": "next dev --port $PORT",
+  "installCommand": "pnpm install",
+  "outputDirectory": ".next",
   "crons": [
     {
       "path": "/api/fetch-videos?force=true",
-      "schedule": "0 */2 * * *" 
+      "schedule": "0 0 * * *"
     }
   ]
 }
